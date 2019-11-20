@@ -2,10 +2,15 @@ package de.thro.inf.prg3.a08.controller;
 
 import com.google.gson.Gson;
 import de.thro.inf.prg3.a08.api.OpenMensaAPI;
+import de.thro.inf.prg3.a08.api.OpenMensaAPIService;
 import de.thro.inf.prg3.a08.model.Meal;
+import de.thro.inf.prg3.a08.model.MealsFilter;
+import de.thro.inf.prg3.a08.model.MealsFilterFactory;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Alert;
@@ -42,7 +47,11 @@ public class MainController implements Initializable {
 	 */
 	private static final DateFormat openMensaDateFormat;
 
-	private final OpenMensaAPI api;
+	private static final OpenMensaAPIService svc = OpenMensaAPIService.getInstance();
+	private OpenMensaAPI apiInstance = svc.getApi();
+
+
+	//private final OpenMensaAPI api;
 	private final ObservableList<Meal> meals;
 	private final Gson gson;
 
@@ -80,7 +89,7 @@ public class MainController implements Initializable {
 			.build();
 
 		/* create OpenMensaAPI instance */
-		api = retrofit.create(OpenMensaAPI.class);
+		apiInstance = retrofit.create(OpenMensaAPI.class);
 	}
 
 	/**
@@ -95,13 +104,14 @@ public class MainController implements Initializable {
 		mealsListView.setItems(meals);
 		filterChoiceBox.setItems(FXCollections.observableList(Arrays.asList(gson.fromJson(new InputStreamReader(getClass().getResourceAsStream("/filters.json")), String[].class))));
 		doGetMeals();
+		chooseFilter();
 	}
 
 	/**
 	 * Handles fetching of meals from OpenMensa API
 	 */
 	private void doGetMeals() {
-		api.getMeals(openMensaDateFormat.format(new Date())).enqueue(new Callback<>() {
+		apiInstance.getMeals(openMensaDateFormat.format(new Date())).enqueue(new Callback<>() {
 			@Override
 			public void onResponse(Call<List<Meal>> call, Response<List<Meal>> response) {
 				logger.debug("Got response");
@@ -127,6 +137,18 @@ public class MainController implements Initializable {
 				alert.setHeaderText("Failed HTTP call");
 				alert.setContentText("Failed to submit HTTP call to fetch meals.");
 				alert.show();
+			}
+		});
+	}
+
+	private void chooseFilter(){
+		filterChoiceBox.setOnAction(new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent event) {
+				String item = filterChoiceBox.getSelectionModel().getSelectedItem();
+				MealsFilter strategy = MealsFilterFactory.getStrategy(item);
+				List<Meal> mealTemp = strategy.filter(meals);
+				meals.setAll(mealTemp);
 			}
 		});
 	}
